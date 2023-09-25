@@ -1,0 +1,185 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*----------- FECHA: 25-09-2023
+
+  *--------------------------------
+	* INDICADORES PCDI3 (ENAPRES)
+  *DESAGREGACION: NACIONAL, DEPARTAMENTAL, LIMA METROPOLITANA Y CALLAO, AREA, AMBITO, REGION NATURAL. 
+	*--------------------------------
+
+	global ruta_ENAPRES "C:\Users\jleiva-prov\Desktop\Jose Leiva\BASES\ENAPRES"
+
+	* Cambiamos de ruta
+
+	cd "$ruta_ENAPRES"	 
+
+
+	  cls
+	 foreach x in P507_5 {
+	     
+		*======================
+		* 2022
+		*======================
+		
+		
+		 use "CAP_500_URBANO_RURAL_6_2022.dta" , clear
+		 
+		 merge 1:1 id  using "v2_CAP_200_URBANO_RURAL_4_2022.dta" 
+		 
+		 keep if _m==3
+		 
+		
+		*--- DEPARTAMENTO
+		*-----------------------
+		
+		clonevar dpto = NOMBREDD
+		encode dpto , g(edpto)
+		drop dpto 
+		rename edpto dpto
+		fre dpto
+		
+		// NOMBREDD: Nombre de departamento
+		// NOMBREPP: Nombre de provincia
+		// NOMBREDI: Nombre de distrito
+		
+		clonevar dpto_desagre = dpto
+		
+		replace dpto_desagre=26 if  NOMBREPP=="LIMA" & NOMBREDD=="LIMA" // Lima Metropolitana (No incluye callao)
+
+		replace dpto_desagre=27 if  NOMBREPP!="LIMA" & NOMBREDD=="LIMA" // Lima provincias
+
+		recode dpto_desagre (1/6=1 "Otros") (7=7 "Callao")  (8/25=1 "Otros") (26=26 "Lima metropolitana") (27=27 "Lima provincias") , g(rdpto_desagre)
+		
+		fre rdpto_desagre
+		
+		*------
+		
+		* AREA DE RESUDENCIA 
+		*---------------------
+
+		gen area_residencia=0 if AREA!=.
+			
+		replace area_residencia=1 if dpto_desagre==7 | dpto_desagre==26 // Lima Metropolitana
+			
+		replace area_residencia=2 if AREA==1 & dpto_desagre!=7 & dpto_desagre!=26 // Resto Urbano
+			
+		replace area_residencia=3 if AREA==2 // Rural
+			
+		label define area_residencia 1 "Lima Metropolitana" 2 "Resto Urbano" 3 "Rural" , replace
+		
+		label values area_residencia area_residencia
+		
+		
+		* Declaramos las caracteristicas de la encuesta 
+	 
+		svyset [pweight=FACTOR], psu(CONGLOMERADO) strata(ESTRATO) singleunit(centered)
+			 
+		
+		
+		di "Variable: `x'"
+		di "====================="
+		
+		replace `x' = 0 if P502!=. & `x'!=1
+	
+		fre `x'
+		
+		di "NACIONAL"
+		svy: mean `x'
+	
+		di "Departamento"
+		svy: mean `x' , over(dpto)
+		svy: mean `x' , over(rdpto_desagre)
+		
+		di "Area"
+		svy: mean `x' , over(AREA)
+		
+		di "Resto Urbano"
+		svy: mean `x' , over(area_residencia)
+		
+		
+		di "COSTA, SIERRA Y SELVA"
+		
+		rename NOMBREDD NOMBDEP
+		rename NOMBREPP NOMBPROV
+		rename NOMBREDI NOMBDIST
+		
+		drop _m
+		
+		foreach z in NOMBDEP NOMBPROV NOMBDIST {
+
+		replace `z' = subinstr(`z', "Á", "A", .)		
+
+		replace `z' = subinstr(`z', "á", "A", .)
+		
+		replace `z' = subinstr(`z', "é", "E", .)
+
+		replace `z' = subinstr(`z', "É", "E", .)		
+
+		replace `z' = subinstr(`z', "í", "I", .)
+
+		replace `z' = subinstr(`z', "Í", "I", .)		
+		
+		replace `z' = subinstr(`z', "ó", "O", .)
+
+		replace `z' = subinstr(`z', "Ó", "O", .)
+		
+		replace `z' = subinstr(`z', "ú", "U", .)
+
+		replace `z' = subinstr(`z', "Ú", "U", .)	
+		
+		}
+
+				
+		replace NOMBDIST = subinstr(NOMBDIST , "HUAYA", "HUALLA", .)
+		
+		replace NOMBPROV = subinstr(NOMBPROV , "NAZCA", "NASCA", .)
+		
+		replace NOMBDIST = subinstr(NOMBDIST , "NAZCA", "NASCA", .)
+		
+		replace NOMBDIST = subinstr(NOMBDIST , "MAZAMARI - PANGOA", "MAZAMARI", .)
+		
+		replace NOMBDIST = subinstr(NOMBDIST , "CONSTITUCIËN", "CONSTITUCION", .)
+		
+		replace NOMBDIST = subinstr(NOMBDIST , "RAYMONDI", "RAIMONDI", .)
+		
+		replace NOMBDIST = subinstr(NOMBDIST , "ANTONIO RAIMONDI", "ANTONIO RAYMONDI", .)
+			 
+		
+		qui merge m:1 NOMBDEP NOMBPROV NOMBDIST using "C:\Users\jleiva-prov\Desktop\Jose Leiva\BASES\MINEDU\Ubigeo_ccpp.dta"
+
+		qui replace REGIONNATURAL="SELVA" if REGIONNATURAL=="SELVA ALTA" | REGIONNATURAL=="SELVA BAJA"
+		
+		qui encode REGIONNATURAL , g(eregion)
+		
+		svy: mean `x' , over(eregion)
+		
+		di "====================="
+		di "====================="
+		di "====================="
+		di "====================="
+		di "====================="
+		di "====================="
+		di "====================="
+		di "====================="
+		di "====================="
+		
+	 }
+	 
+
+
+
+
